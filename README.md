@@ -163,7 +163,7 @@ Connect this repository to Cloudflare Workers:
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `ENVIRONMENT` | Environment name | `production` |
-| `USER_INFO_SERVICE_URL` | Backend service URL | `https://app.email-unsubscriber.com/api` |
+| `USER_INFO_SERVICE_URL` | Backend service URL | `https://api.email-unsubscriber.com/api` |
 | `ALLOWED_REDIRECT_URIS` | Comma-separated allowed redirect URIs | See wrangler.toml |
 
 ### Secrets
