@@ -19,7 +19,7 @@ invocation_logs = true
 [vars]
 ENVIRONMENT = "production"
 USER_INFO_SERVICE_URL = "https://api.email-unsubscriber.com/api"
-ALLOWED_REDIRECT_URIS = "https://app.email-unsubscriber.com/,https://*.email-unsubscriber-webapp.pages.dev/"
+ALLOWED_REDIRECT_URIS = "https://app.email-unsubscriber.com/,https://staging.email-unsubscriber-webapp.pages.dev/,https://develop.email-unsubscriber-webapp.pages.dev/"
 
 # Secrets (set via Cloudflare dashboard or `wrangler secret put`):
 # - GOOGLE_OAUTH_CLIENT_ID
@@ -45,7 +45,7 @@ invocation_logs = true
 [env.staging.vars]
 ENVIRONMENT = "staging"
 USER_INFO_SERVICE_URL = "https://api.email-unsubscriber.com/api-staging"
-ALLOWED_REDIRECT_URIS = "https://app.email-unsubscriber.com/,http://localhost:5173/,http://localhost:3000/,http://127.0.0.1:5173/,https://*.email-unsubscriber-webapp.pages.dev/"
+ALLOWED_REDIRECT_URIS = "https://app.email-unsubscriber.com/,http://localhost:5173/,http://localhost:3000/,http://127.0.0.1:5173/,https://staging.email-unsubscriber-webapp.pages.dev/,https://develop.email-unsubscriber-webapp.pages.dev/"
 
 # =============================================================================
 # LOCAL DEVELOPMENT
