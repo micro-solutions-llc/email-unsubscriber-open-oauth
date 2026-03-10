@@ -25,7 +25,8 @@ export interface TokenExchangeRequest {
 }
 
 /**
- * Response from OAuth provider token endpoint
+ * Response from OAuth provider token endpoint.
+ * Contains only the provider's token fields — no application-level data.
  */
 export interface TokenExchangeResponse {
   access_token: string;
@@ -34,7 +35,28 @@ export interface TokenExchangeResponse {
   scope: string;
   refresh_token?: string;
   id_token?: string;
-  user_info?: unknown;
+}
+
+/**
+ * The oauth object appended to the final /token response.
+ * Contains only token-related fields from the OAuth provider.
+ */
+export interface OAuthTokens {
+  access_token: string;
+  id_token: string;
+  expires_in: number;
+  scope: string;
+  token_type: string;
+}
+
+/**
+ * Result from calling the backend user info service.
+ * Carries both the HTTP status and parsed body regardless of success/failure,
+ * so the Worker can forward the backend response transparently.
+ */
+export interface UserInfoResult {
+  status: number;
+  body: unknown;
 }
 
 /**

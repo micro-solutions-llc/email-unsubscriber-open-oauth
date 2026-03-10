@@ -1,34 +1,17 @@
-import type { Env } from './types';
-
-/**
- * Structured error for user info fetch failures.
- * Carries the HTTP status and parsed response body so callers can
- * forward backend errors (e.g. 403 access denied) transparently.
- */
-export class UserInfoError extends Error {
-  readonly status: number;
-  readonly body: unknown;
-
-  constructor(status: number, body: unknown, message: string) {
-    super(message);
-    this.name = 'UserInfoError';
-    this.status = status;
-    this.body = body;
-  }
-}
+import type { Env, UserInfoResult } from './types';
 
 /**
  * Fetches user info from the backend user info service using the ID token.
- * Returns the raw JSON response to keep the OAuth service schema-agnostic.
+ * Returns both the HTTP status and parsed body regardless of success or failure,
+ * so the Worker can forward the backend response transparently without inspecting it.
  *
  * @param idToken - The ID token from the OAuth provider
  * @param env - Worker environment bindings
  * @param referralCode - Optional referral code to forward to the backend
- * @returns Raw user info JSON from the backend
- * @throws {UserInfoError} if the backend returns a non-2xx status (preserves status + body)
- * @throws {Error} if the response cannot be parsed
+ * @returns The backend's HTTP status and parsed response body
+ * @throws {Error} only if the network request itself fails (fetch throws)
  */
-export async function fetchUserInfo(idToken: string, env: Env, referralCode?: string): Promise<unknown> {
+export async function fetchUserInfo(idToken: string, env: Env, referralCode?: string): Promise<UserInfoResult> {
   const userInfoUrl = `${env.USER_INFO_SERVICE_URL}/user/info`;
 
   const headers: Record<string, string> = {
@@ -44,22 +27,17 @@ export async function fetchUserInfo(idToken: string, env: Env, referralCode?: st
     headers,
   });
 
-  const body = await response.text();
+  const text = await response.text();
 
-  // For non-2xx status, throw a structured error preserving the HTTP status and body
-  if (!response.ok) {
-    throw new UserInfoError(
-      response.status,
-      response.body,
-      `User info request failed with status ${response.status}: ${body}`
-    );
-  }
-
+  let body: unknown;
   try {
-    return JSON.parse(body);
+    body = JSON.parse(text);
   } catch {
-    throw new Error(`Failed to parse user info response: ${body}`);
+    // If the backend returned non-JSON, wrap the raw text
+    body = { raw_response: text };
   }
+
+  return { status: response.status, body };
 }
 
 /**
