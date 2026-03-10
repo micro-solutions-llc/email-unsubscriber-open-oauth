@@ -12,11 +12,11 @@
  * @see https://github.com/xplorya/email-unsubscriber-open-oauth
  */
 
-import type { Env, TokenExchangeRequest, TokenExchangeResponse } from '../lib/types';
+import type { Env, TokenExchangeRequest, TokenExchangeResponse, OAuthTokens } from '../lib/types';
 import { validateRedirectUri, isAllowedOrigin } from '../lib/validation';
 import { exchangeCodeGoogle } from '../lib/oauth-google';
 import { exchangeCodeMicrosoft } from '../lib/oauth-microsoft';
-import { fetchUserInfo, UserInfoError } from '../lib/user-info';
+import { fetchUserInfo } from '../lib/user-info';
 
 
 export default {
@@ -64,6 +64,15 @@ function stripRoutePrefix(pathname: string): string {
 
 /**
  * Handles the OAuth token exchange request.
+ *
+ * Acts as a transparent proxy: exchanges the auth code with the OAuth provider,
+ * then calls the backend /user/info and returns whatever the backend responded
+ * with an `oauth` object appended containing the token fields.
+ *
+ * Response shapes:
+ * - Backend reachable: { ...backendBody, oauth: { tokens } } with backend's HTTP status
+ * - Backend unreachable: { oauth: { tokens }, error_info: { error, error_description } } with 502
+ * - OAuth provider error: { error_info: { error, error_description } } with 400
  */
 async function handleTokenExchange(request: Request, env: Env, origin: string | null): Promise<Response> {
   const allowedUris = env.ALLOWED_REDIRECT_URIS;
@@ -93,9 +102,9 @@ async function handleTokenExchange(request: Request, env: Env, origin: string | 
     return errorResponse('invalid redirect_uri', 400, origin, allowedUris);
   }
 
+  // --- Phase 1: Exchange code for tokens with the OAuth provider ---
+  let tokenResp: TokenExchangeResponse;
   try {
-    // Exchange code for tokens based on provider
-    let tokenResp: TokenExchangeResponse;
     const provider = req.provider.toLowerCase();
 
     switch (provider) {
@@ -107,36 +116,55 @@ async function handleTokenExchange(request: Request, env: Env, origin: string | 
         tokenResp = await exchangeCodeMicrosoft(req, env);
         break;
       default:
-        return errorResponse(`Unsupported OAuth provider: ${provider}`, 400, origin, allowedUris);
+        return jsonResponse(
+          { error_info: { error: 'unsupported_provider', error_description: `Unsupported OAuth provider: ${provider}` } },
+          400,
+          origin,
+          allowedUris,
+        );
     }
-
-    // Validate id_token is present (required for user info fetch)
-    if (!tokenResp.id_token) {
-      console.error(`[${env.ENVIRONMENT}] id_token missing from provider response`);
-      return errorResponse('Token exchange failed', 400, origin, allowedUris);
-    }
-
-    // Fetch user info from backend and attach to response
-    // CRITICAL: If this fails, the entire OAuth flow fails (no graceful degradation)
-    try {
-      const referralCode = request.headers.get('x-referral-code') || undefined;
-      const userInfo = await fetchUserInfo(tokenResp.id_token, env, referralCode);
-      tokenResp.user_info = userInfo;
-    } catch (err) {
-      console.error(`[${env.ENVIRONMENT}] Failed to fetch user info:`, err);
-
-      // Proxy the intact Backend response to the client
-      if (err instanceof UserInfoError) {
-        return jsonResponse(err.body, err.status, origin, allowedUris);
-      }
-
-      return errorResponse('Failed to retrieve user information', 500, origin, allowedUris);
-    }
-
-    return jsonResponse(tokenResp, 200, origin, allowedUris);
   } catch (err) {
+    // OAuth provider error — tokens were never obtained
     console.error(`[${env.ENVIRONMENT}] OAuth token exchange error:`, err);
-    return errorResponse('Token exchange failed', 400, origin, allowedUris);
+    return jsonResponse(
+      { error_info: { error: 'oauth_exchange_failed', error_description: 'Token exchange failed' } },
+      400,
+      origin,
+      allowedUris,
+    );
+  }
+
+  // Build the oauth object with only token-related fields
+  const oauth: OAuthTokens = {
+    access_token: tokenResp.access_token,
+    id_token: tokenResp.id_token!,
+    expires_in: tokenResp.expires_in,
+    scope: tokenResp.scope,
+    token_type: tokenResp.token_type,
+  };
+
+  // --- Phase 2: Call backend /user/info and forward its response transparently ---
+  try {
+    const referralCode = request.headers.get('x-referral-code') || undefined;
+    const result = await fetchUserInfo(tokenResp.id_token!, env, referralCode);
+
+    // Merge backend response body with the oauth object, forward backend's status code
+    const backendBody = (typeof result.body === 'object' && result.body !== null) ? result.body : {};
+    return jsonResponse(
+      { ...backendBody, oauth },
+      result.status,
+      origin,
+      allowedUris,
+    );
+  } catch (err) {
+    // Network/parse error reaching the backend — fetch itself threw
+    console.error(`[${env.ENVIRONMENT}] Failed to reach user info service:`, err);
+    return jsonResponse(
+      { oauth, error_info: { error: 'user_info_unavailable', error_description: 'Failed to reach user info service' } },
+      502,
+      origin,
+      allowedUris,
+    );
   }
 }
 
