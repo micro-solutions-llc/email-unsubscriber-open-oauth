@@ -14,7 +14,7 @@
 #   - MICROSOFT_OAUTH_CLIENT_SECRET
 # =============================================================================
 
-name = "email-unsubscriber-oauth"
+name = "email-unsubscriber-oauth-staging"
 main = "src/index.ts"
 compatibility_date = "2024-01-01"
 
