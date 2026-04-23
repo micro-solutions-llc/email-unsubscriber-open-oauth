@@ -15,7 +15,7 @@
     "microsoft-oauth",
     "email-unsubscriber"
   ],
-  "author": "xplorya",
+  "author": "micro-solutions-llc",
   "license": "MIT",
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20240117.0",

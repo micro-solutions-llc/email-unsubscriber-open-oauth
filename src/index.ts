@@ -9,7 +9,7 @@
  * - Production worker: auth.email-unsubscriber.com/api/* (deployed from main branch)
  * - Staging worker: auth.email-unsubscriber.com/api-staging/* (deployed from staging branch)
  *w
- * @see https://github.com/xplorya/email-unsubscriber-open-oauth
+ * @see https://github.com/micro-solutions-llc/email-unsubscriber-open-oauth
  */
 
 import type { Env, TokenExchangeRequest, TokenExchangeResponse, OAuthTokens } from '../lib/types';
